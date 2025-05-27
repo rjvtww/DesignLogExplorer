@@ -1,0 +1,26 @@
+/.DS_Store
+/.pytest_cache
+/CEPT.ipynb
+/Screening - Automatic Screens.csv
+/Screening - Inclined Conveyors.csv
+/batch_model_exports.py
+/chatgpttranslatepdf.py
+/conv_to_excel.py
+/excel_to_conv.py
+/excel_to_simba.py
+/gujer.py
+/gujer_matrix.csv
+/json-comparison-notebook.ipynb
+/mongo.py
+/mongodb_exports
+/mongodb_pipeline_template_filled.xlsx
+/node_modules
+/package-lock.json
+/package.json
+/pjudexports
+/playwright
+/sample1.json
+/sample2.json
+/simba_to_excel.py
+/simbamodels
+/streamlit-json-comparator.py
