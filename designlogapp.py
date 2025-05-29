@@ -34,15 +34,27 @@ if uploaded_file:
         return None
 
     def extract_relevant_text(text):
+        def round_decimals_in_line(line):
+            return re.sub(r'([-+]?[0-9]*\.[0-9]+)', lambda m: f"{float(m.group()):.2f}", line)
+
         lines = text.splitlines()
         filtered = []
         for line in lines:
             lower = line.lower()
             if "check" in lower and "compliance: no" in lower:
-                filtered.append(line.strip())
+                filtered.append(round_decimals_in_line(line.strip()))
             elif "action" in lower and not ("setting reactor volumes" in lower or "setting excess sludge" in lower):
-                filtered.append(line.strip())
-        return "\n".join(filtered)
+                filtered.append(round_decimals_in_line(line.strip()))
+
+        # Join using <br> but add a new <br> before any new "##" line to force wrapping
+        processed = []
+        for line in filtered:
+            if line.startswith("##") and processed:
+                processed.append("<br>" + line)
+            else:
+                processed.append(line)
+
+        return "<br>".join(processed)
 
     tables_by_iteration = []
     current_block = []
@@ -166,7 +178,7 @@ if uploaded_file:
     for zone in ['anaerobic', 'anoxic', 'aerobic', 'post-anoxic']:
         fig.add_trace(go.Bar(
             x=zone_df['iteration'], y=zone_df[zone], name=zone,
-            marker_color=zone_colors.get(zone), hovertext=zone_hover, hoverinfo='text+y', legendgroup='volume', showlegend=True
+            marker_color=zone_colors.get(zone), hoverinfo='text+y', legendgroup='volume', showlegend=True
         ), row=1, col=1)
     fig.add_trace(go.Scatter(
         x=zone_df['iteration'], y=zone_df['total_volume'], name='Total Volume', mode='lines+markers',
@@ -186,7 +198,7 @@ if uploaded_file:
           name='TN Limit',
           line=dict(color='red', dash='dash'),
           hovertext=tn_hover,
-          hoverinfo='text+y'
+          hoverinfo='x+y'
       ), row=2, col=1)
 
     # Effluent plots
@@ -198,9 +210,9 @@ if uploaded_file:
             sub_hover = hover_df.set_index('iteration').reindex(sub['iteration']).fillna('').shift(-1).hover_text.tolist()
             fig.add_trace(go.Scatter(x=sub['iteration'], y=sub['effluent'], mode='lines+markers', name=f'{var} Effluent', hovertext=sub_hover, hoverinfo='text+y'), row=3+i, col=1)
             if not all(sub['limit'] == -1.00):
-                fig.add_trace(go.Scatter(x=sub['iteration'], y=sub['limit'], mode='lines', name=f'{var} Limit', line=dict(color='red', dash='dash'), hovertext=sub_hover, hoverinfo='text+y'), row=3+i, col=1)
+                fig.add_trace(go.Scatter(x=sub['iteration'], y=sub['limit'], mode='lines', name=f'{var} Limit', line=dict(color='red', dash='dash'), hovertext=sub_hover, hoverinfo='x+y'), row=3+i, col=1)
 
-    fig.update_layout(height=300*num_plots, title_text="Synchronized Plots", hovermode="x unified")
+    fig.update_layout(height=300*num_plots, title_text="Design Log Data", hovermode="x unified",hoversubplots="axis", xaxis_showticklabels=True)
     st.plotly_chart(fig, use_container_width=True)
 
     st.download_button("Download Full Parsed Data (CSV)", parsed_df.to_csv(index=False), file_name="parsed_data.csv")
