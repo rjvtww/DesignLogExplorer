@@ -5,7 +5,7 @@ from plotly.subplots import make_subplots
 import re
 
 st.set_page_config(layout="wide")
-st.title("TDG Design Log for babies - by RV")
+st.title("TDG Biological Simulation Explorer")
 
 uploaded_file = st.file_uploader("Upload a design_log.txt file", type="txt")
 
