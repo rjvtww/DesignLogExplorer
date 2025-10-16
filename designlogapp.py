@@ -23,6 +23,36 @@ else:
 
 if raw_text:
     lines = raw_text.splitlines()
+    
+    # Attempt to extract a project number from the log (fallback to filename)
+    def extract_project_number(text: str, filename: str | None = None):
+        if not isinstance(text, str):
+            return None
+        # Try common patterns near the top of the file
+        head = "\n".join(text.splitlines()[:20])
+        patterns = [
+            r"(?im)^\s*project\s*(?:no\.?|number|id)?\s*[:#-]?\s*(\d{4,9})\b",
+            r"(?im)^\s*(\d{5,9})\b(?:\s*[A-Za-z]{2,}\b)?",
+        ]
+        for pat in patterns:
+            m = re.search(pat, head)
+            if m:
+                return m.group(1)
+        # Fallback: any 5-9 digit token in the first lines
+        m = re.search(r"\b(\d{5,9})\b", head)
+        if m:
+            return m.group(1)
+        # Fallback to filename if present
+        if filename:
+            m = re.search(r"\b(\d{5,9})\b", filename)
+            if m:
+                return m.group(1)
+        return None
+
+    project_number = extract_project_number(
+        raw_text,
+        uploaded_file.name if uploaded_file else (default_log_path.name if default_log_path.exists() else None),
+    )
 
     def clean_cell(cell):
         match = re.match(r'^([-+]?[0-9]*\.?[0-9]+)', cell.strip())
@@ -151,9 +181,32 @@ if raw_text:
         m = re.search(r"(?i)aerob\s*hrt\s*([0-9]+(?:\.[0-9]+)?)\s*d", text)
         return float(m.group(1)) if m else None
 
+    def extract_anoxic_hrt(text: str):
+        if not isinstance(text, str):
+            return None
+        # Match "anox HRT 6.4 h" or "anoxic HRT 0.3 d" (case-insensitive)
+        m = re.search(r"(?i)anox(?:ic)?\s*hrt\s*([0-9]+(?:\.[0-9]+)?)\s*([hd])", text)
+        if not m:
+            return None
+        val = float(m.group(1))
+        unit = m.group(2).lower()
+        # Normalize to days for consistency with Aerobic HRT
+        if unit == 'h':
+            return val / 24.0
+        return val
+
+    def extract_anox_ratio(text: str):
+        if not isinstance(text, str):
+            return None
+        # Match "Anox ratio 0.3" or "Anoxic ratio 0.3"
+        m = re.search(r"(?i)anox(?:ic)?\s*ratio\s*([0-9]+(?:\.[0-9]+)?)", text)
+        return float(m.group(1)) if m else None
+
     # Build maps from raw iteration notes
     mlss_map = {}
     hrt_map = {}
+    anox_hrt_map = {}
+    anox_ratio_map = {}
     srt_current_map = {}
     srt_min_map = {}
     for it, raw in iteration_raw_notes:
@@ -163,6 +216,12 @@ if raw_text:
         hrt_val = extract_aerob_hrt(raw)
         if hrt_val is not None:
             hrt_map[it] = hrt_val
+        anox_hrt_val = extract_anoxic_hrt(raw)
+        if anox_hrt_val is not None:
+            anox_hrt_map[it] = anox_hrt_val
+        anox_ratio_val = extract_anox_ratio(raw)
+        if anox_ratio_val is not None:
+            anox_ratio_map[it] = anox_ratio_val
         # Extract SRT values from CHECK text if present
         if isinstance(raw, str):
             m_curr = re.search(r"(?i)current\s*srt\s*([0-9]+(?:\.[0-9]+)?)\s*d", raw)
@@ -185,6 +244,24 @@ if raw_text:
     for it, val in hrt_map.items():
         extra_rows.append({
             'Reactor': 'Aerobic HRT',
+            'effluent': float(val),
+            'limit': -1.00,
+            'iteration': it,
+            'subtable': 'quality',
+        })
+    # Append Anoxic HRT (normalized to days)
+    for it, val in anox_hrt_map.items():
+        extra_rows.append({
+            'Reactor': 'Anoxic HRT',
+            'effluent': float(val),
+            'limit': -1.00,
+            'iteration': it,
+            'subtable': 'quality',
+        })
+    # Append Anoxic Ratio (unitless)
+    for it, val in anox_ratio_map.items():
+        extra_rows.append({
+            'Reactor': 'Anoxic Ratio',
             'effluent': float(val),
             'limit': -1.00,
             'iteration': it,
@@ -270,6 +347,10 @@ if raw_text:
             ["INFO", "CHECK", "OTHER", "WARNING", "ACTION"],
         )
         st.markdown(html_table, unsafe_allow_html=True)
+
+    # Subheader showing project number between folded tables and plots (if detected)
+    if project_number:
+        st.subheader(f"Project {project_number}")
 
     # Build per-iteration hover HTML from categorized notes for use across plots
     def build_hover_notes_html(row):
