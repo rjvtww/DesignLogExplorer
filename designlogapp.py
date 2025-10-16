@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import re
 from html import escape
+from typing import Optional
 from pathlib import Path
 
 st.set_page_config(layout="wide")
@@ -25,7 +26,7 @@ if raw_text:
     lines = raw_text.splitlines()
     
     # Attempt to extract a project number from the log (fallback to filename)
-    def extract_project_number(text: str, filename: str | None = None):
+    def extract_project_number(text: str, filename: Optional[str] = None):
         if not isinstance(text, str):
             return None
         # Try common patterns near the top of the file
